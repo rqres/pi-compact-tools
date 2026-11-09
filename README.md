@@ -20,12 +20,17 @@ Requires Node.js 22.19+ and Pi 0.85.1+. **Pi 1.0.2+ recommended** for native ren
 
 | Style | What you see | Command |
 |---|---|---|
+| **Focus** | One category-aware group per request; original rows on demand | `/compact-tools focus` |
 | **Claude** | Grouped reads/searches, `⎿` results, edit previews | `/compact-tools claude` |
 | **Codex** | `• Explored` groups, `• Ran` output, highlighted diffs | `/compact-tools codex` |
 | **Compact** (default) | One row per call: status, duration, line count, and diff | `/compact-tools compact` |
 | **Off / Pi native** | Pi's original rows, thinking display, and working indicator | `/compact-tools off` |
 
-Every style, including **off**, redraws existing rows immediately, even while tools run. No reload or interruption is needed. Only read-only exploration is grouped; commands that write or execute work keep separate rows.
+Every style, including **off**, redraws existing rows immediately, even while tools run. No reload or interruption is needed. Focus groups all calls in one request; Claude and Codex group only read-only exploration, so commands that write or execute work keep separate rows.
+
+### Focus
+
+Focus mode folds a request's tool calls and thinking into one live summary such as `3 tool calls · read 2 · ran 3 shell commands · 0 failed`. Literal intermediate assistant prose remains visible. Click the group to reveal the original rows.
 
 ### Claude
 
@@ -67,13 +72,14 @@ The two failed edits are intentional. Reload/resume preserves summaries from nes
 
 ```text
 /compact-tools                 # choose style and save scope
+/compact-tools focus global    # group each request into one summary
 /compact-tools claude project  # save for this trusted project
 /compact-tools codex global    # save globally
 /compact-tools status          # effective settings and paths
 /compact-tools off             # restore Pi's native UI live, even while streaming
 ```
 
-Without a scope, changes are saved where the style is configured: project or global. A trusted project's own style overrides a global save. `/compact-tools off` immediately restores native tool rows, unmodified thinking, Pi's working indicator and keyboard behavior, with no grouping or silent hiding—even while a response or tool is running. No reload, abort, or restart occurs. Your selected theme, tool execution, and session history are not changed. Use `/compact-tools compact`, `claude`, or `codex` to enable it again, also live. Your silent-mode choice is retained for when you re-enable a style; `/silent` while off only updates that saved choice, without hiding native UI.
+Without a scope, changes are saved where the style is configured: project or global. A trusted project's own style overrides a global save. `/compact-tools off` immediately restores native tool rows, unmodified thinking, Pi's working indicator and keyboard behavior, with no grouping or silent hiding—even while a response or tool is running. No reload, abort, or restart occurs. Your selected theme, tool execution, and session history are not changed. Use `/compact-tools focus`, `compact`, `claude`, or `codex` to enable a style again, also live. Your silent-mode choice is retained for when you re-enable a style; `/silent` while off only updates that saved choice, without hiding native UI.
 
 - Click a row/group or press `Ctrl+O` to expand/collapse. On Pi 1.5+, output hints follow your configured expand key.
 - `Ctrl+T` changes the thinking display, not the model's reasoning effort.

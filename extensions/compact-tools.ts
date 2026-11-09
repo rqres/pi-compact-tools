@@ -102,7 +102,7 @@ function rowKind(name: string): RowKind {
 }
 
 function isClaude(): boolean {
-	return runtime.config.style === "claude";
+	return runtime.config.style === "claude" || runtime.config.style === "focus";
 }
 
 function isCodex(): boolean {
@@ -622,8 +622,8 @@ function configure(_pi: ExtensionAPI, cwd?: string, projectTrusted = false, fail
 }
 
 /**
- * Apply a style saved by /compact-tools without reloading Pi. The compact, Claude, and
- * Codex styles share every tool registration and read the style as they draw, so the
+ * Apply a style saved by /compact-tools without reloading Pi. The compact, Focus, Claude,
+ * and Codex styles share every tool registration and read the style as they draw, so the
  * configuration is swapped and each tool row on screen is drawn again, a running one
  * included. Only non-style configuration changes require a reload.
  */

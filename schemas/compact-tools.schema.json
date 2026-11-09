@@ -9,10 +9,10 @@
       "type": "string"
     },
     "style": {
-      "description": "How tool rows are drawn. compact draws each call as a compact, expandable row. claude draws them the way Claude Code does: runs of reads, searches, listings, and commands that only look around fold into one summary line, while other commands, edits, writes, and custom tools keep rows of their own with Bash(…), Update(…), and similar titles; click a group or press Ctrl+O to open it. codex draws them the way Codex CLI does: calls that only look around fold into a • Explored group, commands read Ran or Failed (exit N) with their last three output lines, edits preview their changed lines, and custom tools read • Called; Ctrl+O or a click opens each one. off leaves every tool with Pi's own renderer.",
+      "description": "How tool rows are drawn. focus folds all tool work in one request into one category-aware summary, with the original rows available on demand. compact draws each call as a compact, expandable row. claude draws them the way Claude Code does: runs of reads, searches, listings, and commands that only look around fold into one summary line, while other commands, edits, writes, and custom tools keep rows of their own with Bash(…), Update(…), and similar titles; click a group or press Ctrl+O to open it. codex draws them the way Codex CLI does: calls that only look around fold into a • Explored group, commands read Ran or Failed (exit N) with their last three output lines, edits preview their changed lines, and custom tools read • Called; Ctrl+O or a click opens each one. off leaves every tool with Pi's own renderer.",
       "type": "string",
-      "enum": ["compact", "claude", "codex", "off"],
-      "default": "compact"
+      "enum": ["focus", "compact", "claude", "codex", "off"],
+      "default": "focus"
     },
     "mode": {
       "description": "normal shows every tool row. silent leaves only your prompts and the final answers: tool rows, in-between assistant turns, thinking, error and abort notices, extension notices, and Pi's own status lines are hidden while a light animates beneath the prompt. Ctrl+' or /silent toggles it for the current session, in any style.",

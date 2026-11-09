@@ -1,6 +1,7 @@
 import {
 	AssistantMessageComponent,
 	ToolExecutionComponent,
+	UserMessageComponent,
 	type AgentToolResult,
 	type ExtensionContext,
 	type Theme,
@@ -25,6 +26,7 @@ import {
 	type Segment,
 } from "./compact-tools-codex.ts";
 import { formatDurationMs, type RowStatus } from "./compact-tools-core.ts";
+import { focusCounts, groupFocusChildren, type FocusRow } from "./compact-tools-focus.ts";
 import { hookMethod } from "./compact-tools-hook.ts";
 import { getTextResult } from "./compact-tools-invocation.ts";
 import { outputPadLines } from "./compact-tools-layout.ts";
@@ -203,6 +205,8 @@ export class ToolGroupComponent extends Container {
 		private readonly onToggle: (expanded: boolean) => void,
 		/** Lines beneath an opened group's members, which a click closes too. */
 		footer?: (width: number) => string[],
+		/** Focus only: literal assistant prose that stays visible while the group is collapsed. */
+		visible: readonly unknown[] = [],
 	) {
 		super();
 		// Ctrl+O expands every tool row in Pi; the group follows it both ways.
@@ -218,6 +222,7 @@ export class ToolGroupComponent extends Container {
 			this.onToggle(this.state.expanded);
 			return { handled: true };
 		};
+		for (const child of visible) this.addChild(child as Component);
 		this.addChild({ render: (width) => this.draw(this.rows, width, this.state.expanded), invalidate() {}, handleMouse } as Component);
 		if (!state.expanded) return;
 		for (const member of members) this.addChild(member as Component);
@@ -233,7 +238,10 @@ function isGroupable(child: unknown, style: GroupStyle = "claude"): child is Too
 	return style === "codex" ? exploreOf(child as ToolRowLike) !== undefined : kindOf(child as ToolRowLike) !== undefined;
 }
 
-type AssistantLike = { lastMessage?: { content?: Array<{ type: string; text?: string }> } };
+type AssistantLike = {
+	hasToolCalls?: boolean;
+	lastMessage?: { content?: Array<{ type: string; text?: string }> };
+};
 
 /** A turn with no text for the reader: it only thought, then handed off to tools. */
 function isThinkingOnly(child: unknown): boolean {
@@ -309,11 +317,20 @@ export class ToolGroupController {
 			if (chat) {
 				hookMethod(chat, "render", "claude.groups", (self, args, original) => {
 					const style = this.runtime.config.style;
-					if (!this.context || isSilent() || (style !== "claude" && style !== "codex")) return original.apply(self, args);
+					if (!this.context || isSilent() || (style !== "focus" && style !== "claude" && style !== "codex")) return original.apply(self, args);
 					const children = self.children as unknown[];
 					this.paint = this.resolvePaint();
 					openExplorations.clear();
-					self.children = groupChildren(children, (rows, members) => this.makeGroup(rows, members, tui), style);
+					const makeGroup = (rows: ToolRowLike[], members: unknown[], visible: unknown[] = []) => this.makeGroup(rows, members, visible, tui);
+					self.children = style === "focus"
+						? groupFocusChildren<unknown>(children, (rows, members, visible) => makeGroup(rows as ToolRowLike[], members, visible), {
+							isTool: (child) => isKind(child, ToolExecutionComponent),
+							isUser: (child) => isKind(child, UserMessageComponent),
+							isAssistant: (child) => isKind(child, AssistantMessageComponent),
+							isThinkingOnly: (child) => isKind(child, AssistantMessageComponent) && isThinkingOnly(child),
+							isFoldable: (child) => isKind(child, Text) || isKind(child, Spacer),
+						})
+						: groupChildren(children, makeGroup, style);
 					try {
 						return original.apply(self, args);
 					} finally {
@@ -332,7 +349,7 @@ export class ToolGroupController {
 		context?.ui.setWidget(WIDGET_KEY, undefined, { placement: "belowEditor" });
 	}
 
-	private makeGroup(rows: ToolRowLike[], members: unknown[], tui: { requestRender(): void }): Component {
+	private makeGroup(rows: ToolRowLike[], members: unknown[], visible: unknown[] = [], tui: { requestRender(): void }): Component {
 		const key = rows[0]!;
 		let state = this.states.get(key);
 		if (!state) {
@@ -344,7 +361,7 @@ export class ToolGroupController {
 			const pad = group[0]?.outputPad;
 			return outputPadLines(this.drawCached(group, width + (pad === 0 ? 1 : 0), expanded, groupState), width, pad);
 		};
-		if (this.runtime.config.style !== "codex") return new ToolGroupComponent(rows, members, state, draw, () => tui.requestRender());
+		if (this.runtime.config.style !== "codex") return new ToolGroupComponent(rows, members, state, draw, () => tui.requestRender(), undefined, visible);
 		// Codex opens a group to the whole of each call, and closes it from one "− Show less" beneath them.
 		const toggle = (expanded: boolean) => {
 			for (const row of rows) row.setExpanded?.(expanded);
@@ -356,7 +373,7 @@ export class ToolGroupController {
 			const available = width + (pad === 0 ? 1 : 0);
 			return theme ? outputPadLines([truncateToWidth(theme.fg("dim", codexDisclosure(available, true)), Math.max(1, available), "…")], width, pad) : [];
 		};
-		const group = new ToolGroupComponent(rows, members, state, draw, toggle, footer);
+		const group = new ToolGroupComponent(rows, members, state, draw, toggle, footer, visible);
 		// Read once the group has followed Ctrl+O, which it does as it is made. A call that joins an
 		// opened group opens with it, as every call in an opened Codex group shows whole.
 		if (state.expanded) {
@@ -401,8 +418,33 @@ export class ToolGroupController {
 		return lines;
 	}
 
+	/** Focus folds one request's tool work into one category-aware summary. */
+	private drawFocus(rows: readonly ToolRowLike[], width: number, paint: Paint): string[] {
+		const { theme, chrome } = paint;
+		const fit = (line: string) => truncateToWidth(line, Math.max(1, width), "…");
+		const running = lastRunning(rows, this.canRun);
+		const statuses = rows.map((row) => memberStatus(row, this.canRun));
+		const status: RowStatus = running ? "running" : statuses.includes("error") ? "error"
+			: statuses.includes("pending") ? "pending" : "success";
+		const counts = focusCounts(rows as readonly FocusRow[]);
+
+		let title = ` ${paintIndicator(theme, status, this.runtime.frame)} `;
+		title += theme.fg("toolTitle", `${counts.total} ${counts.total === 1 ? "tool call" : "tool calls"}`);
+		if (counts.reads) title += chrome(" · ") + theme.fg("toolTitle", `read ${counts.reads}`);
+		if (counts.searches) title += chrome(" · ") + theme.fg("toolTitle", `searched ${counts.searches}`);
+		if (counts.commands) title += chrome(" · ") + theme.fg("toolTitle", `ran ${counts.commands} ${counts.commands === 1 ? "shell command" : "shell commands"}`);
+		if (counts.edits) title += chrome(" · ") + theme.fg("toolTitle", `edited ${counts.edits}`);
+		title += chrome(" · ") + (counts.failed ? theme.fg("error", `${counts.failed} failed`) : theme.fg("muted", "0 failed"));
+		if (running) {
+			this.runtime.keepAnimating(running.toolCallId);
+			title += chrome(" …");
+		}
+		return ["", fit(title)];
+	}
+
 	/** Claude's quiet completed exploration; active and interrupted calls keep a status cue. */
 	private draw(rows: readonly ToolRowLike[], width: number, expanded: boolean, paint: Paint): string[] {
+		if (this.runtime.config.style === "focus") return this.drawFocus(rows, width, paint);
 		if (this.runtime.config.style === "codex") return this.drawCodex(rows, width, expanded, paint);
 		// Ctrl+O replaces the summary with individual calls, as Claude's transcript
 		// does. A locally clicked group retains its header as a collapse target.

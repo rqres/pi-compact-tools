@@ -7,9 +7,10 @@ import { loadConfig } from "./compact-tools-config.ts";
 
 type Scope = "global" | "project";
 const SCOPES: readonly Scope[] = ["global", "project"];
-const HELP = "Usage: /compact-tools [compact|claude|codex|off] [global|project]\nWithout a scope the style is saved globally, or to this project when its settings choose the style.\n/compact-tools status · /compact-tools help\nCtrl+O expands rows; /silent toggles quiet mode. All styles, including off, switch at once, even while tools run.";
+const HELP = "Usage: /compact-tools [focus|compact|claude|codex|off] [global|project]\nWithout a scope the style is saved globally, or to this project when its settings choose the style.\n/compact-tools status · /compact-tools help\nCtrl+O expands rows; /silent toggles quiet mode. All styles, including off, switch at once, even while tools run.";
 const BUSY = "Wait for the current response to finish before changing tool styles.";
 const CHOICES: Record<DisplayStyle, string> = {
+	focus: "Focus — one grouped summary per request",
 	compact: "Compact — one expandable row per tool call",
 	claude: "Claude — group reads and searches",
 	codex: "Codex — explored groups and output tails, like Codex CLI",
@@ -85,7 +86,7 @@ export type ApplyStyle = (cwd: string, trusted: boolean, ctx: ExtensionContext) 
 
 export function registerCompactToolsCommand(pi: ExtensionAPI, getConfig: () => CompactToolsConfig, applyStyle?: ApplyStyle): void {
 	pi.registerCommand("compact-tools", {
-		description: "Choose compact/Claude/Codex/default tool rows, or show settings and controls",
+		description: "Choose Focus/compact/Claude/Codex/default tool rows, or show settings and controls",
 		getArgumentCompletions: (prefix) => {
 			const typed = prefix.trimStart().toLowerCase();
 			const parts = typed.split(/\s+/);

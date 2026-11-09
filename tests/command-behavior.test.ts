@@ -189,7 +189,7 @@ test("the chooser offers Codex, and choosing it saves the codex style", async ()
 		};
 		h.selections.push("Codex — explored groups and output tails, like Codex CLI", "Global — all projects");
 		await h.run("");
-		assert.deepEqual(offered.map((option) => option.split(" — ")[0]), ["Compact", "Claude", "Codex", "Off"]);
+		assert.deepEqual(offered.map((option) => option.split(" — ")[0]), ["Focus", "Compact", "Claude", "Codex", "Off"]);
 		assert.equal(loadConfig().style, "codex");
 		assert.equal(h.state.reloads, 1);
 	} finally { h.cleanup(); }
